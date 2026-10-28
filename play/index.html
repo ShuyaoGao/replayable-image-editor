@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>可回放图像编辑器</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ===================== 顶栏：标题 + 模式标签 + 右上角按钮 ===================== -->
+<header id="topbar">
+  <div class="brand"><span id="app-name">可回放图像编辑器</span><small id="app-tagline"></small></div>
+  <nav id="modes" role="tablist">
+    <button data-mode="watch" role="tab" title="自动播放一段示例日志：看每一步操作被记成什么">看回放</button>
+    <button data-mode="edit" role="tab" title="自己修图，右栏实时显示你的操作日志和 token">我来修图</button>
+    <button data-mode="practice" role="tab" title="带任务清单的分步练习，完成一项自动打勾">练习</button>
+  </nav>
+  <span class="spacer"></span>
+  <label class="switch" title="把左右比例从约 45:55 调到约 35:65，方便投影"><input type="checkbox" id="bigscreen"> 大屏模式</label>
+  <button id="help-btn" class="icon" title="操作说明（H）">?</button>
+  <button id="exit-btn" class="exit" title="停止全部计算并关闭页面">退出</button>
+  <!-- 手机竖屏：其余入口收进 ☰ 菜单（由 app.js 在 body.touchp 时显示） -->
+  <button id="menu-btn" aria-label="菜单" aria-expanded="false" aria-controls="menu">☰</button>
+  <div id="menu" role="menu" hidden>
+    <button role="menuitem" id="menu-log">操作日志 · 校验 · 像素原理</button>
+    <button role="menuitem" id="menu-export">导出操作日志 (.jsonl)</button>
+    <button role="menuitem" id="menu-import">导入日志并回放…</button>
+    <button role="menuitem" id="menu-help">操作说明</button>
+    <div class="sep"></div>
+    <button role="menuitem" id="menu-exit">退出</button>
+  </div>
+</header>
+
+<main id="layout">
+  <!-- ===================== 左栏：编辑器（主画面）+ 选项 / 播放控制 / 说明 ===================== -->
+  <section id="leftcol">
+    <div id="editor">
+      <div id="menubar">
+        <div class="menu" data-menu="file">文件
+          <div class="dropdown">
+            <div onclick="UI.showNewDoc()">新建文档…</div>
+            <div onclick="$('file-open').click()">打开图片（新文档）…</div>
+            <div onclick="$('file-place').click()">导入图片为图层…</div>
+            <hr>
+            <div onclick="UI.exportPNG()">导出 PNG（透明）</div>
+            <div onclick="UI.exportJPG()">导出 JPG（白底）</div>
+            <hr>
+            <div onclick="OpLog.exportJSONL()">导出操作日志 (.jsonl)</div>
+            <div onclick="$('file-replay').click()">导入日志并回放…</div>
+          </div>
+        </div>
+        <div class="menu" data-menu="edit">编辑
+          <div class="dropdown">
+            <div onclick="Ops.run({op:'undo',params:{}})">撤销 <kbd>Ctrl+Z</kbd></div>
+            <div onclick="Ops.run({op:'redo',params:{}})">重做 <kbd>Ctrl+Y</kbd></div>
+            <hr>
+            <div onclick="Ops.run({op:'deselect',params:{}})">取消选区 <kbd>Ctrl+D</kbd></div>
+          </div>
+        </div>
+        <div class="menu" data-menu="image">图像
+          <div class="dropdown">
+            <div onclick="UI.showAdjust('brightness')">亮度…</div>
+            <div onclick="UI.showAdjust('contrast')">对比度…</div>
+            <div onclick="UI.showAdjust('saturate')">饱和度…</div>
+            <div onclick="UI.showAdjust('hue')">色相旋转…</div>
+            <div onclick="UI.showAdjust('blur')">高斯模糊…</div>
+            <div onclick="UI.showAdjust('sharpen')">锐化…</div>
+            <hr>
+            <div onclick="Ops.run({op:'filter',params:{layerId:Doc.activeId,type:'invert',value:1}})">反相</div>
+            <div onclick="Ops.run({op:'filter',params:{layerId:Doc.activeId,type:'grayscale',value:1}})">去色（灰度）</div>
+            <hr>
+            <div onclick="UI.showTransform()">变换图层（缩放/旋转/翻转）…</div>
+          </div>
+        </div>
+        <div class="menu" data-menu="view">视图
+          <div class="dropdown">
+            <div onclick="UI.zoomBy(1.25)">放大 <kbd>滚轮</kbd></div>
+            <div onclick="UI.zoomBy(0.8)">缩小</div>
+            <div onclick="UI.zoomFit()">适应窗口</div>
+            <div onclick="UI.zoomTo(1)">实际像素 100%</div>
+          </div>
+        </div>
+        <span class="spacer"></span>
+        <span id="rec-badge" title="所有操作都会被序列化记录，可导出为模型训练数据">● 记录中 <b id="rec-count">0</b> 条操作</span>
+      </div>
+
+      <div id="editor-body">
+        <div id="toolbar">
+          <button data-tool="move"           data-tip="move">✥</button>
+          <button data-tool="select-rect"    data-tip="select-rect">▭</button>
+          <button data-tool="select-ellipse" data-tip="select-ellipse">◯</button>
+          <button data-tool="brush"          data-tip="brush">🖌</button>
+          <button data-tool="eraser"         data-tip="eraser">⌫</button>
+          <button data-tool="fill"           data-tip="fill">🪣</button>
+          <button data-tool="gradient"       data-tip="gradient">▒</button>
+          <button data-tool="shape"          data-tip="shape">⬛</button>
+          <button data-tool="text"           data-tip="text">T</button>
+          <button data-tool="eyedropper"     data-tip="eyedropper">⊙</button>
+          <button data-tool="crop"           data-tip="crop">✂</button>
+          <button data-tool="hand"           data-tip="hand">✋</button>
+        </div>
+        <div id="viewport">
+          <canvas id="stage"></canvas>
+          <canvas id="overlay"></canvas>
+          <div id="demo-cursor"></div>
+          <div id="lock-badge">演示中：画布只读（切到「我来修图」或「练习」就能动手）</div>
+          <div id="replay-mask"><div>▶ 回放中 <b id="replay-prog">0/0</b><br>
+            <button class="mini" onclick="Replay.stop()" style="margin-top:10px">停止</button></div></div>
+        </div>
+      </div>
+
+      <div id="optionsbar">
+        <span class="colors" title="前景色 / 背景色">
+          <input type="color" id="fg-color" value="#e53935" title="前景色（画笔、填充、文字）">
+          <input type="color" id="bg-color" value="#ffffff" title="背景色（渐变终点、形状描边）">
+        </span>
+        <span class="opt opt-brush opt-eraser">大小 <input type="range" id="opt-size" min="1" max="200" value="14">
+          <b id="opt-size-v">14</b>px</span>
+        <span class="opt opt-brush opt-eraser">不透明度 <input type="range" id="opt-opacity" min="1" max="100" value="100">
+          <b id="opt-opacity-v">100</b>%</span>
+        <span class="opt opt-fill">容差 <input type="range" id="opt-tol" min="0" max="120" value="32">
+          <b id="opt-tol-v">32</b></span>
+        <span class="opt opt-shape">形状
+          <select id="opt-shape-kind"><option value="rect">矩形</option>
+            <option value="ellipse">椭圆</option><option value="line">直线</option></select>
+          <label><input type="checkbox" id="opt-shape-fill" checked>填充</label>
+          <label><input type="checkbox" id="opt-shape-stroke">描边</label>
+          线宽 <input type="number" id="opt-shape-width" min="1" max="60" value="4" style="width:52px">
+        </span>
+        <span class="opt opt-text">内容 <input type="text" id="opt-text" value="" style="width:140px">
+          字号 <input type="number" id="opt-text-size" min="8" max="300" value="48" style="width:58px">
+          字体 <select id="opt-text-font"></select>
+        </span>
+        <span class="opt opt-crop">拖出裁剪框后：
+          <button class="mini" onclick="Tools.crop.apply()">✔ 应用裁剪</button>
+          <button class="mini" onclick="Tools.crop.cancel()">✖ 取消</button></span>
+        <span class="opt opt-move opt-select-rect opt-select-ellipse opt-gradient opt-eyedropper opt-hand" id="opt-tip"></span>
+        <span class="spacer"></span>
+        <span id="doc-info">960 × 640</span>
+      </div>
+
+      <div id="layerbar">
+        <div class="layerctl">
+          <b class="lbl">图层</b>
+          <button class="mini" title="新建图层" onclick="Ops.run({op:'layer_add',params:{}})">＋</button>
+          <button class="mini" title="复制图层" onclick="Ops.run({op:'layer_duplicate',params:{layerId:Doc.activeId}})">⧉</button>
+          <button class="mini" title="向下合并" onclick="Ops.run({op:'layer_merge_down',params:{layerId:Doc.activeId}})">⤓</button>
+          <button class="mini" title="删除图层" onclick="Ops.run({op:'layer_delete',params:{layerId:Doc.activeId}})">🗑</button>
+          <button class="mini" title="上移" onclick="Ops.run({op:'layer_reorder',params:{layerId:Doc.activeId,dir:1}})">▲</button>
+          <button class="mini" title="下移" onclick="Ops.run({op:'layer_reorder',params:{layerId:Doc.activeId,dir:-1}})">▼</button>
+          <label title="当前图层不透明度">不透明 <input type="range" id="layer-opacity" min="0" max="100" value="100"></label>
+          <select id="layer-blend" title="混合模式">
+            <option value="source-over">正常</option><option value="multiply">正片叠底</option>
+            <option value="screen">滤色</option><option value="overlay">叠加</option>
+            <option value="darken">变暗</option><option value="lighten">变亮</option>
+          </select>
+        </div>
+        <div id="layers" title="点击选中图层；双击名字改名；👁 显示 / 隐藏"></div>
+      </div>
+    </div>
+
+    <!-- 手机竖屏的操作区（我来修图 / 练习）：大按钮，触控区 ≥ 44px -->
+    <div id="mob-actions">
+      <button id="mob-undo" title="撤销">↶ 撤销</button>
+      <button id="mob-redo" title="重做">↷ 重做</button>
+      <button id="mob-export" title="导出操作日志 (.jsonl)">⬇ 导出</button>
+      <button id="mob-log" class="primary" title="全屏打开右栏：操作日志、回放校验、像素原理">📋 看日志</button>
+    </div>
+
+    <!-- 播放控制 + 说明（随模式变化） -->
+    <div id="dock">
+      <div id="dock-watch" class="dockpane">
+        <div class="playctl">
+          <button class="mini primary" id="pl-play" title="播放 / 暂停（空格）">⏸ 暂停</button>
+          <button class="mini" id="pl-step" title="暂停时执行下一条">⏭ 单步</button>
+          <button class="mini" id="pl-restart" title="从头再播一遍">⟲ 从头</button>
+          <span class="seg" id="speed-presets" title="回放速度"></span>
+          <span class="prog"><span id="pl-bar"></span></span>
+          <b id="pl-count">0 / 0</b>
+        </div>
+        <div id="caption"><b id="cap-title">准备开始</b><span id="cap-text">示例图完全由程序画出（渐变、形状、笔画、滤镜），没有使用任何照片。</span></div>
+      </div>
+      <div id="dock-edit" class="dockpane">
+        <div class="howto">
+          <b>自由修图：</b>左边工具栏选工具（悬停可看动画演示），在画布上拖动；菜单「图像」里有亮度、色相、模糊、锐化等调整。
+          每一步都会出现在右栏：先看它被记成哪一行 JSON，再看它变成哪些 token。
+        </div>
+        <div class="quick">
+          <button class="mini" onclick="OpLog.exportJSONL()">⬇ 导出日志 .jsonl</button>
+          <button class="mini" onclick="$('file-replay').click()">⬆ 导入日志并回放</button>
+          <button class="mini" onclick="OpLog.clear()">✕ 清空（新建空白画布）</button>
+        </div>
+      </div>
+      <div id="dock-practice" class="dockpane">
+        <div class="tasks-head"><b>练习任务</b><span id="task-progress">0 / 0</span>
+          <button class="mini" id="task-reset" title="重新开始练习（恢复示例图，清空打勾）">重新开始</button></div>
+        <ol id="tasks"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 右栏：为什么会这样 ===================== -->
+  <section id="rightcol">
+    <div class="card" id="card-op">
+      <h3>这一步被记成了什么 <span class="sub" id="op-cn"></span><span class="spacer"></span>
+        <span class="seg" id="quant-presets" title="token 量化档位"></span></h3>
+      <div class="opbox">
+        <pre id="op-json">（还没有操作）</pre>
+        <div class="tokwrap">
+          <div class="tokhead">token 序列 <b id="tok-count">0</b> 个 · <span id="quant-desc"></span></div>
+          <div id="tokens"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-tabs">
+      <div class="tabs" role="tablist">
+        <button data-rtab="log" class="on">操作日志</button>
+        <button data-rtab="verify">回放校验 · 量化</button>
+        <button data-rtab="pixel">像素原理</button>
+        <span class="spacer"></span>
+        <span class="hint" id="rtab-hint"></span>
+      </div>
+
+      <div class="rpane on" id="rpane-log">
+        <div class="loghead">共 <b id="log-n">0</b> 条，其中改变画面的 <b id="log-nd">0</b> 条（灰色是视图 / 选工具等上下文信号，不改像素）
+          <span class="spacer"></span>
+          <button class="mini" onclick="OpLog.exportJSONL()" title="导出 JSONL">⬇ 导出</button></div>
+        <div id="oplist"></div>
+      </div>
+
+      <div class="rpane" id="rpane-verify">
+        <p class="explain">核心理念：<b>画布状态 = 回放(操作日志)</b>。下面两个按钮都会“清空画布、从第一条日志重新执行”，
+          然后比较画布的指纹（所有像素算出的 32 位哈希）。</p>
+        <div class="vrow">
+          <button class="mini primary" id="btn-verify">① 重置并按日志回放</button>
+          <span id="verify-out" class="out">还没校验</span>
+        </div>
+        <div class="vrow">
+          <button class="mini primary" id="btn-quant">② 按当前量化档位回放并算 PSNR</button>
+          <span id="quant-out" class="out">量化档位在本卡片上方右侧切换</span>
+        </div>
+        <div class="thumbs">
+          <figure><canvas id="th-orig" width="240" height="160"></canvas><figcaption>原日志回放</figcaption></figure>
+          <figure><canvas id="th-quant" width="240" height="160"></canvas><figcaption id="th-quant-cap">量化日志回放</figcaption></figure>
+          <figure><canvas id="th-diff" width="240" height="160"></canvas><figcaption>差异 ×8（越亮差得越多）</figcaption></figure>
+        </div>
+        <table class="qtable" id="quant-table">
+          <thead><tr><th>档位</th><th>坐标档数</th><th>颜色每通道</th><th>PSNR</th><th>有差异的像素</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="note">PSNR 越高越像（∞ 表示逐像素完全一致）。注意 PSNR 对“边缘错位”很敏感：文字、细线挪动 1 个像素，
+          肉眼几乎看不出，PSNR 却会掉到 20 多 dB——所以实际评估常再配合感知指标（如 LPIPS）。
+          量化只改坐标和颜色这两类参数，其余参数原样保留。</p>
+      </div>
+
+      <div class="rpane" id="rpane-pixel">
+        <p class="explain" id="px-title">执行一次「图像」菜单里的调整（或看回放到滤镜那一步），这里会显示它对像素做了什么。</p>
+        <div class="pxrow">
+          <div class="hist"><canvas id="hist" width="420" height="150"></canvas>
+            <div class="legend"><span class="b">■ 调整前</span> <span class="a">■ 调整后</span> · 横轴：亮度 0→255（64 档），纵轴：像素数</div></div>
+          <div class="formula"><div id="px-formula">—</div><div id="px-matrix"></div></div>
+        </div>
+        <p class="note">所有调整都是浏览器里逐像素计算的 JavaScript（不是浏览器自带的 CSS 滤镜），公式见 play/js/pixel_filters.js。</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="footer"></footer>
+
+<!-- 手机竖屏：右栏全屏展开时的「返回」；横屏时的提示 -->
+<button id="sheet-close" type="button">← 返回</button>
+<div id="rotate-hint" role="status"><div><b>竖屏体验更佳</b>把手机竖过来：上面是画布，下面是工具和按钮。<br>
+  <button id="rot-ok" type="button">仍然横屏继续</button></div></div>
+
+<!-- ===================== 对话框 ===================== -->
+<div class="dlg-mask" id="dlg-new">
+  <div class="dlg">
+    <h3>新建文档</h3>
+    <label>宽度 <input type="number" id="new-w" value="960" min="16" max="4096"> px</label>
+    <label>高度 <input type="number" id="new-h" value="640" min="16" max="4096"> px</label>
+    <label>背景 <select id="new-bg">
+      <option value="#ffffff">白色</option><option value="transparent">透明</option>
+      <option value="#000000">黑色</option></select></label>
+    <div class="dlg-btns">
+      <button class="mini" onclick="UI.closeDlg()">取消</button>
+      <button class="mini primary" onclick="UI.confirmNewDoc()">创建</button>
+    </div>
+  </div>
+</div>
+
+<div class="dlg-mask" id="dlg-adjust">
+  <div class="dlg">
+    <h3 id="adj-title">调整</h3>
+    <label><span id="adj-label">数值</span>
+      <input type="range" id="adj-range" min="-100" max="100" value="0">
+      <b id="adj-v">0</b></label>
+    <p class="dlg-note">拖动滑块实时预览；右栏「像素原理」同步显示直方图和公式。</p>
+    <div class="dlg-btns">
+      <button class="mini" onclick="UI.cancelAdjust()">取消</button>
+      <button class="mini primary" onclick="UI.confirmAdjust()">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="dlg-mask" id="dlg-transform">
+  <div class="dlg">
+    <h3>变换当前图层</h3>
+    <label>缩放 <input type="range" id="tf-scale" min="10" max="300" value="100"><b id="tf-scale-v">100</b>%</label>
+    <label>旋转 <input type="range" id="tf-rotate" min="-180" max="180" value="0"><b id="tf-rotate-v">0</b>°</label>
+    <label><input type="checkbox" id="tf-fliph"> 水平翻转　<input type="checkbox" id="tf-flipv"> 垂直翻转</label>
+    <div class="dlg-btns">
+      <button class="mini" onclick="UI.cancelTransform()">取消</button>
+      <button class="mini primary" onclick="UI.confirmTransform()">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="dlg-mask" id="dlg-help">
+  <div class="dlg help">
+    <h3>操作说明 <span class="sub">（随时按 H 或右上角 “?” 再打开）</span></h3>
+    <div class="helpgrid">
+      <div>
+        <h4>这是什么</h4>
+        <p>一个能用的网页图像编辑器。和普通编辑器不同的是：<b>你的每一次操作都被记成一行 JSON</b>，
+          整段日志可以导出、导入，并且<b>按日志回放能逐像素还原画面</b>。这样的“操作序列”可以当作训练数据，
+          让模型学习“人是怎么一步步修图的”。</p>
+        <h4>三个模式（页面顶部）</h4>
+        <ul>
+          <li><b>看回放</b>：自动播放一段示例日志，每一步都有说明；可以暂停、单步、调速度。</li>
+          <li><b>我来修图</b>：自己动手，右栏实时显示你的操作被记成什么、变成哪些 token。</li>
+          <li><b>练习</b>：按任务清单一步步做，完成一项自动打勾。</li>
+        </ul>
+        <h4>右栏</h4>
+        <p>上面：当前这一步的 JSON 与 token；下面三个标签：完整日志、回放校验与量化（PSNR）、滤镜的像素原理。</p>
+      </div>
+      <div>
+        <h4>怎么操作</h4>
+        <ul class="help-kbd">
+          <li>左侧工具栏选工具，<b>鼠标停在按钮上会出现动画演示</b>。</li>
+          <li>滚轮缩放；<b>按住空格拖动</b>（或用 ✋）平移画布。</li>
+          <li>快捷键：V 移动 · M 矩形选区 · B 画笔 · E 橡皮 · G 油漆桶 · U 形状 · T 文字 · I 吸管 · C 裁剪</li>
+          <li>Ctrl+Z 撤销 · Ctrl+Y 重做 · Ctrl+D 取消选区 · [ ] 调画笔大小 · H 打开本说明</li>
+        </ul>
+        <div class="help-touch">
+          <svg viewBox="0 0 360 230" role="img" aria-label="触屏操作图解：上方画布用手指画，下方一排工具按钮，右下「看日志」">
+            <rect x="8" y="6" width="344" height="150" rx="8" class="ht-canvas"/>
+            <path d="M60 100 C 110 40, 160 150, 230 70 S 300 60, 320 110" class="ht-stroke"/>
+            <circle cx="320" cy="110" r="16" class="ht-finger"/>
+            <text x="180" y="30" class="ht-label">① 手指 / 触控笔 / 鼠标在画布上拖动 = 一笔</text>
+            <g class="ht-tools">
+              <rect x="8" y="166" width="40" height="40" rx="7"/><text x="28" y="192">✥</text>
+              <rect x="54" y="166" width="40" height="40" rx="7"/><text x="74" y="192">▭</text>
+              <rect x="100" y="166" width="40" height="40" rx="7" class="on"/><text x="120" y="192">🖌</text>
+              <rect x="146" y="166" width="40" height="40" rx="7"/><text x="166" y="192">⌫</text>
+              <rect x="192" y="166" width="40" height="40" rx="7"/><text x="212" y="192">🪣</text>
+              <rect x="238" y="166" width="40" height="40" rx="7"/><text x="258" y="192">▒</text>
+              <rect x="284" y="166" width="68" height="40" rx="7" class="log"/><text x="318" y="192" class="logt">看日志</text>
+            </g>
+            <text x="8" y="224" class="ht-label2">② 下方一排工具：点一下换工具，左右滑动看更多　③「看日志」全屏看右栏，「返回」关闭</text>
+          </svg>
+          <p><b>手机 / 平板</b>：上面是画布，下面是工具条、选项条、图层条和「撤销 / 重做 / 导出 / 看日志」四个大按钮；
+            整页不用上下滚动。右上角 ☰ 里有导入 / 导出日志、操作说明和退出。</p>
+        </div>
+        <h4>两组预设档位</h4>
+        <ul>
+          <li><b>回放速度</b>：逐条讲解 / 正常 / 快速 / 瞬间。</li>
+          <li><b>token 量化</b>：原始 / 细 1024 / 中 256 / 粗 64 —— 档数越少词表越小，回放误差越大，用 PSNR 衡量。</li>
+        </ul>
+        <h4>关于离线</h4>
+        <p>这是纯静态网页：不联网、不上传任何图片或数据，关掉标签页就全部结束。</p>
+      </div>
+    </div>
+    <div class="dlg-btns help-btns"><button class="mini primary" id="help-close">开始</button></div>
+  </div>
+</div>
+
+<div id="tip" role="tooltip"><canvas id="tip-anim" width="168" height="100"></canvas><div id="tip-title"></div><div id="tip-text"></div></div>
+
+<div id="ended"><div><h2>已停止运行</h2><p>所有计算都已结束，可以直接关闭这个标签页。</p></div></div>
+
+<input type="file" id="file-open"   accept="image/*" hidden>
+<input type="file" id="file-place"  accept="image/*" hidden>
+<input type="file" id="file-replay" accept=".jsonl,.json,.txt" hidden>
+
+<div id="toast"></div>
+<pre id="selftest" hidden></pre>
+
+<script src="js/config.js"></script>
+<script src="js/credits.js"></script>
+<script src="js/pixel_filters.js"></script>
+<script src="js/oplog_tokens.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

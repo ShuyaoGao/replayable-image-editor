@@ -1,0 +1,163 @@
+> **AI 教学演示案例 / AI Teaching Demos** 系列
+
+# 可回放图像编辑器（Replayable Image Editor）
+
+**每一次修图操作都是一条数据：可导出、可回放、可逐像素复现。**
+
+**Shuyao Gao**（gaoshuyao.mk@gmail.com）· aSSIST University (Seoul School of Integrated Sciences and Technologies) · 서울과학종합대학원대학교
+代码 MIT · 文档与教学素材 CC BY 4.0
+
+一个打开就能用的网页图像编辑器（图层、画笔、油漆桶、渐变、形状、文字、选区、逐像素调整、撤销重做），和普通编辑器的区别只有一点：**你的每一次操作都被记成一行 JSON**。把这段日志交给同一个执行器从头回放，画布能逐像素还原——所以这段日志就是一份现成的“人是怎么一步步修图的”训练数据。页面会自动播放一段程序画出来的示例日志，把每一步显示成 JSON 和 token，再把坐标和颜色量化成四个档位回放、算 PSNR，并用公式、颜色矩阵或卷积核解释每一次调整。电脑和手机都能用，不需要安装、不需要联网。
+
+**English summary.** *Replayable Image Editor* is a browser-only teaching demo: a small image editor in which every edit is recorded as one JSON line, so replaying the log through the same executor reproduces the canvas pixel for pixel and the log doubles as a behaviour-cloning dataset. The page auto-plays a procedurally drawn demo log, shows each operation as JSON and as tokens, replays the log with quantised coordinates and colours at four presets and reports PSNR, and explains every per-pixel adjustment with its formula, colour matrix or convolution kernel. Works on desktop and on phones (portrait layout, pointer / touch drawing), from GitHub Pages or from `file://` after a double-click. UI and documentation are in Chinese.
+
+![看回放：第 21 步，锐化滤镜的卷积核与直方图](docs/img/01-watch-1920x1080.png)
+
+## 怎么打开：不用安装任何东西
+
+- **手机**：点在线链接 <https://shuyaogao.github.io/replayable-image-editor/>（GitHub Pages，打开就能用；竖屏体验最好）。
+- **电脑**：点同一个在线链接 <https://shuyaogao.github.io/replayable-image-editor/>；或者在 [Releases](https://github.com/ShuyaoGao/replayable-image-editor/releases) 下载 `replayable-image-editor-v1.0.zip`，解压后双击 **`index.html`**；或者点 **Code → Download ZIP**，解压后双击 **`play/index.html`**。
+
+不需要 Python，不需要联网：页面是纯 HTML + JS，Windows 用系统自带的 Edge、Mac 用 Safari 打开即可（Safari 需要在真实 Mac 上确认，见“常见问题”）。
+
+## 怎么用
+
+### 电脑（键鼠）
+
+页面顶部三个模式标签：
+
+| 模式 | 你看到什么 | 你能做什么 |
+|---|---|---|
+| **看回放**（默认） | 一段 28 条操作的示例日志自动播放：光标演示每个手势，下方一句话说明，右栏同步显示这一步被记成的 JSON 和 token | 暂停、单步、从头；回放速度四档：逐条讲解 / 正常 / 快速 / 瞬间 |
+| **我来修图** | 编辑器解锁，示例图留在画布上 | 画笔、橡皮、油漆桶、渐变、形状、文字、选区、裁剪、图层（不透明度、混合模式）、亮度 / 对比度 / 饱和度 / 色相 / 模糊 / 锐化 / 反相 / 去色、变换、撤销重做；导出 PNG 和 `.jsonl` 日志，导入日志回放 |
+| **练习** | 7 项任务清单，完成一项自动打勾 | 画一笔 → 新图层上画形状 → 选区内调整 → 撤销重做 → 回放校验 → 量化回放看 PSNR → 导出日志 |
+
+右栏是“为什么会这样”：
+
+- **这一步被记成了什么**：当前操作的 JSON，以及它变成的 token 序列；右上角切换量化档位：原始 / 细 1024 / 中 256 / 粗 64（坐标切成多少档、颜色每通道几档）。
+- **操作日志**：完整日志，灰色的是“选工具、缩放视图”这类不改像素的上下文信号。
+- **回放校验 · 量化**：① 清空画布、按日志从头回放，比较画布指纹；② 把日志按当前档位量化后再回放，算 PSNR，并排显示原图、量化回放和差异图。
+- **像素原理**：每次调整前后的亮度直方图，以及公式、颜色矩阵或卷积核。
+
+工具栏按钮悬停会出现小动画，演示这个工具怎么用。快捷键：V 移动 · M 选区 · B 画笔 · E 橡皮 · G 油漆桶 · U 形状 · T 文字 · I 吸管 · C 裁剪 · 按住空格平移 · 滚轮缩放 · Ctrl+Z / Ctrl+Y / Ctrl+D · `[` `]` 调画笔大小 · **H 打开操作说明**。右上角有“大屏模式”（左右比例 45:55 → 35:65，方便投影）和“退出”（停下所有计算，关不掉标签页时提示你直接关）。第一次打开会弹出操作说明，之后按 H 或右上角 “?” 再看。
+
+### 手机（触屏）
+
+竖屏打开。头部只有标题、三个模式标签和 ☰ 菜单（导入 / 导出日志、操作说明、退出都在菜单里）。
+
+- **看回放**：画布贴顶、按屏幕宽度缩放，下面是播放控制和每一步的说明，再往下滑是右栏的紧凑版（JSON / token、操作日志、回放校验、像素原理）。
+- **我来修图 / 练习**：一屏显示，整页不滚动。上方画布占满宽度，**手指、触控笔、鼠标都能画**（Pointer Events；第二根手指不会画出第二笔）；下方是一排工具按钮（左右滑动看更多）、选项条、图层条和四个大按钮「撤销 / 重做 / 导出 / 看日志」。「看日志」把右栏全屏展开，「返回」关闭。所有按钮的触控区都不小于 44px，画布区关闭了长按菜单、文字选中和双击缩放。
+- 横屏时会提示“竖屏体验更佳”，也可以点“仍然横屏继续”。
+- 首次打开的操作说明在触屏设备上显示触屏操作图解，不显示键盘快捷键。
+
+<img src="docs/img/04-mobile-edit-390x844.png" alt="手机竖屏（390×844）「我来修图」：画布占满宽度，刚用手指画了一笔；下方是工具条、选项条、图层条和四个大按钮" width="300">
+
+## 课堂上怎么用（推荐顺序，约 20 分钟）
+
+1. **看回放，逐条讲解速度**（5 分钟）：停在“渐变 → 天空”——两个端点和两种颜色就能还原整片天空，参数比像素小得多；停在“粗白笔画 → 云”——一笔是一串坐标点，这是训练数据里最长的部分；停在“撤销”——撤销也被记录，模型能学到“试了又后悔”。
+2. **回放校验**（3 分钟）：演示结束时右栏自动做一次“重置并回放”，指纹一致：**画布状态 = 回放(操作日志)**。
+3. **量化与 PSNR**（5 分钟）：同一段日志在四个量化档位下回放（见下面“实测数字”里的表）。讨论：词表越小，模型越好学，但还原得越差；为什么文字和细线挪 1 个像素 PSNR 就掉很多。
+4. **我来修图 / 练习**（7 分钟）：同学自己修一张图（手机上也可以），导出 `.jsonl`，和同桌交换后导入回放。
+
+## 它是怎么做的
+
+```
+UI 按钮 / 手势 ──┐
+                 ├──> Ops.run(op) ──> Ops.apply(op)（唯一修改入口）──> 画布状态
+JSONL 回放 ──────┘                         │
+                                           ├──> 操作日志（每行 {seq, t, op, params}，导出 JSONL）
+                                           └──> 撤销 / 重做快照
+```
+
+- 界面操作和回放走**同一个执行器** `Ops.apply`，所以回放结果确定；打开的图片以 dataURL 内嵌在 `image_open` 操作里，日志自包含。
+- 亮度、对比度、饱和度、色相、模糊、锐化、反相、去色全部是**浏览器里逐像素计算的 JavaScript**（`play/js/pixel_filters.js`），公式按 W3C Filter Effects 规范里同名滤镜的定义；不依赖浏览器的 `ctx.filter`，所以各浏览器行为一致，右栏也能把公式摆出来。
+- 量化与 token 化在 `play/js/oplog_tokens.js`：坐标按文档宽高归一化后切成 N 档、取档中心还原；颜色每通道切成 L 档。只量化坐标和颜色，其余参数原样保留。
+
+**实测数字**（全部来自 `results/result.json`，由 `python -m tools.browser_check` 在 Microsoft Edge 155.0.4283.45 无头模式下跑页面自检生成）：
+
+- 覆盖性自检：20 条用户操作（日志共 22 条，含会话头和新建文档）→ 重置并回放 → 画布指纹一致。
+- 示例日志：28 条操作，其中改变像素的 24 条；重置并回放后指纹一致；按“中 256”档 token 化共 191 个 token。
+- 同一段示例日志按四个档位量化后回放（画布 614,400 像素）：
+
+| 档位 | 坐标档数 | 颜色每通道 | PSNR | 有差异的像素 |
+|---|---|---|---|---|
+| 原始 | 不量化 | 256 | ∞（逐像素一致） | 0 |
+| 细 1024 | 1024 | 256 | 19.56 dB | 7.3% |
+| 中 256 | 256 | 16 | 18.67 dB | 100.0% |
+| 粗 64 | 64 | 4 | 17.21 dB | 100.0% |
+
+画布指纹（FNV-1a）只在同一浏览器内核、同一套字体下保证一致；换浏览器或换电脑，文字和抗锯齿边缘可能有细微差别。
+
+![回放校验与量化：四个档位的 PSNR 与差异图](docs/img/02-quant-1920x1080.png)
+
+**手机 / 电脑尺寸验收**（来自 `results/mobile_check.json`，由 `python -m tools.mobile_check_editor` 用 Microsoft Edge 155.0.4283.45 通过 DevTools 协议模拟设备生成）：
+6 个尺寸全部通过（6 / 6）——触屏竖屏 390×844（DPR 3）、414×896（DPR 3）、360×780（DPR 3）、768×1024（DPR 2），电脑 1920×1080、1366×768。每个尺寸检查：没有横向溢出；「我来修图」「练习」整页不滚动；用模拟触摸（或鼠标）在画布上画一笔后，操作日志多一条 `brush_stroke`、画布指纹改变；右栏面板（手机上是「看日志」全屏面板）能打开和关闭；☰ 菜单和操作说明能打开；没有 JS 报错。
+
+## 想自己修改或验证
+
+`play/` 是纯 HTML + JS，没有编译步骤，改完直接刷新页面。
+
+```bash
+pip install pytest                    # 只有测试需要
+python -m pytest -q                   # 静态检查（file:// 规则、命名、署名）+ Node 单元测试（需要 Node.js）+ result.json / mobile_check.json 检查
+RUN_BROWSER=1 python -m pytest -q     # 另外用本机 Edge / Chrome 无头跑页面自检（1920×1080 与 1366×768）和六个尺寸的验收
+python -m tools.browser_check --shots docs/img   # 重新生成 results/result.json 和电脑截图
+python -m tools.mobile_check_editor              # 重新生成 results/mobile_check.json 和手机截图（需要 pip install playwright 和本机 Edge）
+python -m tools.build --release       # 重新生成 play/js/credits.js、docs/examples/demo_ops.jsonl 和 release/*.zip
+python -m tools.fill_credits          # 改了 credits.json（署名 / 仓库名）后，一次替换 README 等文件里的全部占位
+```
+
+页面自检也可以手动看：打开 `play/index.html?selftest=1`，几秒后标签页标题变成 `SELFTEST PASS`。
+`docs/examples/demo_ops.jsonl` 是示例日志的导出文件，可以在「我来修图 → 导入日志并回放」里直接导入。
+
+## 目录结构
+
+```
+index.html             根目录入口：跳到 play/index.html（Pages 和解压后双击都从这里进）
+.nojekyll              让 GitHub Pages 原样发布文件，不经过 Jekyll
+play/                  双击即玩的静态页面（Release zip = index.html + play/）
+  index.html
+  css/app.css          电脑两栏布局 + 手机竖屏布局（body.touchp）
+  js/config.js         名称、日志标识、字体列表（改名只改这里）
+  js/credits.js        署名（由 credits.json 生成）
+  js/pixel_filters.js  逐像素调整与滤镜（纯函数）
+  js/oplog_tokens.js   token 化、量化、PSNR、画布指纹（纯函数）
+  js/editor.js         编辑器引擎：图层、工具（Pointer Events）、执行器、日志、撤销、回放
+  js/demo.js           程序生成的示例日志与自检操作
+  js/app.js            页面外壳：模式、右栏可视化、练习、说明、手机竖屏菜单与面板、退出、自检
+tests/                 pytest + Node 单元测试
+tools/                 构建、无头浏览器自检与截图、六尺寸验收（mobile_check.py 是公用的设备模拟 / Edge 锁）、占位替换
+results/result.json    页面自检的结果；results/mobile_check.json 六个尺寸的验收结果（README 里的数字都来自这两个文件）
+docs/img/              截图；docs/examples/demo_ops.jsonl 示例日志
+credits.json           署名、联系邮箱、系列名、仓库名
+```
+
+## 常见问题
+
+- **关掉页面后还有程序在跑吗？** 没有。离线版是纯静态网页，关掉标签页就全部结束，不留后台进程；右上角“退出”（手机在 ☰ 里）会先停下所有计算再尝试关闭页面。
+- **手机上怎么用？** 竖屏打开在线链接：默认看回放，往下滑看右栏；点「我来修图」后上方画布、下方工具，手指直接在画布上画；「看日志」打开右栏，「返回」关闭；☰ 里有导入 / 导出日志、操作说明和退出。导出的 `.jsonl` 会按手机浏览器的下载方式保存。
+- **会上传我的图片吗？** 不会。页面不联网，图片只在浏览器内存里；导出的 `.jsonl` 会把打开的图片以 dataURL 形式写进文件，分享日志前请注意。
+- **Mac 和 iPhone 上能用吗？** 页面只用标准 Web 接口，但目前只在 Windows 的 Edge（Chromium 内核）上自动测试过，手机尺寸也是用它模拟的；Safari（Mac / iPhone）和 Firefox **未测**，需要在真机上确认一次。
+- **旧版本导出的日志能导入吗？** 能。本项目早期内部版本的日志标识也被接受；但早期版本的模糊等滤镜用的是浏览器自带滤镜，回放出来的像素会和当时略有不同。
+- **文字换了电脑看起来不一样？** 文字工具按名字使用系统字体，示例日志用通用字体 sans-serif；不同系统的字形不同，这是回放跨电脑不能逐像素一致的主要原因。
+
+## 许可证与引用
+
+代码 MIT（[LICENSE](LICENSE)），文档与教学素材（README、docs/、页面文字、截图）CC BY 4.0（[LICENSE-docs](LICENSE-docs)），使用请注明出处。
+引用信息见 [CITATION.cff](CITATION.cff)（GitHub 右侧的 “Cite this repository”）。第三方说明见 [THIRD_PARTY.md](THIRD_PARTY.md)。联系作者：gaoshuyao.mk@gmail.com。
+本项目与任何商业图像编辑软件及其厂商没有关联。
+
+## AI 辅助开发声明
+
+代码由 Claude Code 辅助编写，经作者审阅。
+
+## English summary
+
+**Replayable Image Editor** is a browser-only teaching demo (AI Teaching Demos) by Shuyao Gao (gaoshuyao.mk@gmail.com), aSSIST University (Seoul School of Integrated Sciences and Technologies). It is a small image
+editor (layers, brush, fill, gradient, shapes, text, selections, per-pixel adjustments, undo/redo) in which every edit is
+recorded as one JSON line. Replaying the log through the same executor reproduces the canvas pixel for pixel, so the log
+is a ready-made behaviour-cloning dataset. The page auto-plays a procedurally drawn demo log, shows each operation as JSON
+and as tokens, replays the log with quantised coordinates and colours at four presets and reports PSNR, and explains every
+adjustment with its formula, colour matrix or convolution kernel. On phones (portrait) the canvas fills the width and is
+drawn with Pointer Events (finger, stylus or mouse); the log panel opens full-screen. Open it on GitHub Pages, or
+double-click `index.html` from the release zip — no install, no network. Code: MIT; docs: CC BY 4.0.

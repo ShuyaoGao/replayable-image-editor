@@ -1,0 +1,19 @@
+{
+  "_comment": "署名、系列名、用户名、仓库名集中在这里；改完运行 python -m tools.fill_credits（发布目录里）或 python -m tools.build。AUTHOR_EMAIL 是作者有意公开的联系邮箱：只写进 README、CITATION.cff、LICENSE-docs 和页面页脚，不放进任何网络请求。",
+  "SERIES_NAME_ZH": "AI 教学演示案例",
+  "SERIES_NAME_EN": "AI Teaching Demos",
+  "AUTHOR": "Shuyao Gao",
+  "AUTHOR_EMAIL": "gaoshuyao.mk@gmail.com",
+  "UNIVERSITY_EN": "aSSIST University (Seoul School of Integrated Sciences and Technologies)",
+  "UNIVERSITY_KO": "서울과학종합대학원대학교",
+  "GH_USER": "ShuyaoGao",
+  "GH_USER_LOWER": "shuyaogao",
+  "REPO_NAME": "replayable-image-editor",
+  "PAGES_URL": "https://shuyaogao.github.io/replayable-image-editor/",
+  "APP_NAME_ZH": "可回放图像编辑器",
+  "APP_NAME_EN": "Replayable Image Editor",
+  "YEAR": "2026",
+  "VERSION": "1.0",
+  "RELEASE_DATE": "2026-10-14",
+  "UNIVERSITY_LOGO": ""
+}

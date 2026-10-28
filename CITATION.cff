@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "如果在教学或研究中使用了本项目，请按以下信息引用。If you use this project, please cite it as below."
+title: "replayable-image-editor: 可回放图像编辑器 (Replayable Image Editor)"
+type: software
+authors:
+  - family-names: Gao
+    given-names: Shuyao
+    email: "gaoshuyao.mk@gmail.com"
+    affiliation: "aSSIST University (Seoul School of Integrated Sciences and Technologies)"
+version: "1.0"
+date-released: "2026-10-14"
+license: MIT
+repository-code: "https://github.com/ShuyaoGao/replayable-image-editor"
+url: "https://shuyaogao.github.io/replayable-image-editor/"
+abstract: >-
+  A browser-only teaching demo (AI Teaching Demos): an image editor in which every edit is recorded
+  as one JSON line. Replaying the log reproduces the canvas pixel for pixel, so the log is a
+  ready-made behaviour-cloning dataset. The page shows each operation as JSON and as tokens,
+  replays the log with quantised coordinates and colours at four presets and reports PSNR,
+  and explains every adjustment (per-pixel formulas, colour matrices, convolution kernels).
+keywords:
+  - course-demo
+  - image-editing
+  - behavior-cloning
+  - tokenization
+  - teaching demo

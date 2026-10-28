@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "如果在教学或研究中使用了本项目，请按以下信息引用。If you use this project, please cite it as below."
+title: "{{REPO_NAME}}: {{APP_NAME_ZH}} ({{APP_NAME_EN}})"
+type: software
+authors:
+  - family-names: Gao
+    given-names: Shuyao
+    email: "{{AUTHOR_EMAIL}}"
+    affiliation: "{{UNIVERSITY_EN}}"
+version: "{{VERSION}}"
+date-released: "{{RELEASE_DATE}}"
+license: MIT
+repository-code: "https://github.com/{{GH_USER}}/{{REPO_NAME}}"
+url: "{{PAGES_URL}}"
+abstract: >-
+  A browser-only teaching demo ({{SERIES_NAME_EN}}): an image editor in which every edit is recorded
+  as one JSON line. Replaying the log reproduces the canvas pixel for pixel, so the log is a
+  ready-made behaviour-cloning dataset. The page shows each operation as JSON and as tokens,
+  replays the log with quantised coordinates and colours at four presets and reports PSNR,
+  and explains every adjustment (per-pixel formulas, colour matrices, convolution kernels).
+keywords:
+  - course-demo
+  - image-editing
+  - behavior-cloning
+  - tokenization
+  - teaching demo
